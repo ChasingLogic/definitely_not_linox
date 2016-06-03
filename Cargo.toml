@@ -8,6 +8,7 @@ crate-type = ["staticlib"]
 
 [dependencies]
 rlibc = "*"
+spin = "*"
 
 [profile.dev]
 panic = "abort"

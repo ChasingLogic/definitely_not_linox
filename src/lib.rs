@@ -1,15 +1,19 @@
-#![feature(lang_items)]
+#![feature(lang_items, const_fn, unique)]
 #![no_std]
 
 extern crate rlibc;
+extern crate spin;
+
 mod io;
+
+use core::fmt::Write;
+use io::vga::WRITER;
 
 #[no_mangle]
 pub extern fn rust_main() {
     // ATTENTION: we have a very small stack and no guard page
-    io::vga::print(0x0F, b"Hello World!", 0);
-    io::vga::print(0x0F, b"Goodbye World!", 13);
-
+    WRITER.lock().write_str("Hello this is a line of text!\n");
+    WRITER.lock().write_str("New line!");
     loop{}
 }
 
