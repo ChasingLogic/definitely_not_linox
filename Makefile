@@ -1,26 +1,36 @@
-default: build
+arch ?= x86_64
+kernel := build/kernel-$(arch).bin
+iso := build/os-$(arch).iso
 
-build: build/os.iso
+linker_script := src/arch/$(arch)/linker.ld
+grub_cfg := src/arch/$(arch)/grub.cfg
+assembly_source_files := $(wildcard src/arch/$(arch)/*.asm)
+assembly_object_files := $(patsubst src/arch/$(arch)/%.asm, \
+	build/arch/$(arch)/%.o, $(assembly_source_files))
 
-run: build/os.iso
-	qemu-system-x86_64 -cdrom build/os.iso
+.PHONY: all run clean iso
 
-build/multiboot_header.o: multiboot_header.asm
-	mkdir -p build
-	nasm -f elf64 multiboot_header.asm -o build/multiboot_header.o
-
-build/boot.o: boot.asm
-	mkdir -p build
-	nasm -f elf64 boot.asm -o build/boot.o
-
-build/kernel.bin: build/boot.o build/multiboot_header.o linker.ld
-	ld -n -o build/kernel.bin -T linker.ld build/multiboot_header.o build/boot.o
-
-build/os.iso: build/kernel.bin grub.cfg
-	mkdir -p build/isofiles/boot/grub
-	cp grub.cfg build/isofiles/boot/grub
-	cp build/kernel.bin build/isofiles/boot/
-	grub-mkrescue -o build/os.iso build/isofiles
+all: $(kernel)
 
 clean:
-	rm -rf build
+	@rm -rf build
+
+run: $(iso)
+	@qemu-system-x86_64 -cdrom $(iso)
+
+iso: $(iso)
+
+$(iso): $(kernel) $(grub_cfg)
+	@mkdir -p build/isofiles/boot/grub
+	@cp $(kernel) build/isofiles/boot/kernel.bin
+	@cp $(grub_cfg) build/isofiles/boot/grub
+	@grub-mkrescue -o $(iso) build/isofiles 2> /dev/null
+	@rm -rf build/isofiles
+
+$(kernel): $(assembly_object_files) $(linker_script)
+	ld -n -T $(linker_script) -o $(kernel) $(assembly_object_files)
+
+# compile assembly files
+build/arch/$(arch)/%.o: src/arch/$(arch)/%.asm
+	@mkdir -p $(shell dirname $@)
+	@nasm -felf64 $< -o $@
