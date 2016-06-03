@@ -3,6 +3,43 @@ global start
 section .text
 bits 32
 start:
+  call setup_page_tables
+  call enable_paging
+
+  ; load our GDT
+  lgdt [gdt64.pointer]
+
+  ; Our last task is to update several special registers called 'segment
+  ; registers'. Again, we're not using segmentation, but things won't work
+  ; unless we set them properly.
+
+  ; update selectors
+  mov ax, gdt64.data
+  mov ss, ax
+  mov ds, ax
+  mov es, ax
+  ; Here's a short rundown of these registers:
+  ;
+  ; ax: This isn't a segment register. It's a sixteen-bit register. Remember
+  ; 'eax' from our loop accumulator? The 'e' was for 'extended', and it's the
+  ; thirty-two bit version of the ax register. The segment registers are sixteen
+  ; bit values, so we start off by putting the data part of our GDT into it,
+  ; to load into all of the segment registers.
+  ;
+  ; ss: The 'stack segment' register. We don't even have a stack yet, that's how
+  ; little we're using this. Still needs to be set.
+  ;
+  ; ds: the 'data segment' register. This points to the data segment of our GDT,
+  ; which is conveniently what we loaded into ax.
+  ;
+  ; es: an 'extra segment' register. Not used, still needs to be set.
+
+  ; Updates the code segment register
+  ; jump to long mode!
+  jmp gdt64.code:long_mode_start
+  hlt
+
+setup_page_tables:
   ; Point the first entry of the level 4 page table to the first entry in the
   ; p3 table, which is all 0's
   ;
@@ -30,7 +67,6 @@ start:
   mov eax, p2_table
   or eax, 0b11
   mov dword [p3_table], eax
-
   ; point each page table level two entry to a page
   mov ecx, 0         ; counter variable
   ; begin loop
@@ -55,6 +91,9 @@ start:
   ; jne = Jump if not equal to. i.e. loop again if ecx != 512
   jne .map_p2_table
 
+  ret
+
+enable_paging:
   ; move page table address to cr3
   ; cr3 is a control register and can only be moved to from another register
   ; hence moving p4_table into eax first
@@ -91,25 +130,7 @@ start:
   or eax, 1 << 16
   mov cr0, eax
 
-  ; load our GDT
-  lgdt [gdt64.pointer]
-
-  ; Print hello world when done to make sure we succeed.
-  mov word [0xb8000], 0x0248    ; H
-  mov word [0xb8002], 0x0265    ; e
-  mov word [0xb8004], 0x026C    ; l
-  mov word [0xb8006], 0x026C    ; l
-  mov word [0xb8008], 0x026F    ; o
-  mov word [0xb8010], 0x0220    ; (space)
-  mov word [0xb8012], 0x0257    ; W
-  mov word [0xb8014], 0x026F    ; o
-  mov word [0xb8016], 0x0272    ; r
-  mov word [0xb8018], 0x026C    ; l
-  mov word [0xb8020], 0x0264    ; d
-  hlt
-
-
-
+  ret
 
 section .bss                    ; block started by symbol
 ; Entries in the bss section are automatically set to zero by the linker.
@@ -136,6 +157,7 @@ section .rodata                 ; stands for read only data
 gdt64:
   ; first entry in GDT needs to be a zero value
   dq 0
+.code: equ $ - gdt64
   ; Set up the code segment of the GDT
   ; | is bitwise or
   dq (1<<44) | (1<<47) | (1<<41) | (1<<43) | (1<<53)
@@ -146,10 +168,9 @@ gdt64:
   ; 41: ‘read/write’: If this is a code segment, 1 means that it’s readable
   ; 43: ‘executable’: Set to `1 for code segments
   ; 53: ‘64-bit’: if this is a 64-bit GDT, this should be set
-
+.data: equ $ - gdt64
   ; Set up the data segment
   dq (1<<44) | (1<<47) | (1<<41)
-
 .pointer:
   ; length of the gdt
   dw .pointer - gdt64 - 1
