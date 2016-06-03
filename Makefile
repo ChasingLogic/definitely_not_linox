@@ -8,12 +8,16 @@ assembly_source_files := $(wildcard src/arch/$(arch)/*.asm)
 assembly_object_files := $(patsubst src/arch/$(arch)/%.asm, \
 	build/arch/$(arch)/%.o, $(assembly_source_files))
 
+target ?= $(arch)-unknown-linux-gnu
+rust_os := target/$(target)/debug/libdefinitely_not_linox.a
+
 .PHONY: all run clean iso
 
 all: $(kernel)
 
 clean:
 	@rm -rf build
+	@rm -rf target
 
 run: $(iso)
 	@qemu-system-x86_64 -cdrom $(iso)
@@ -27,10 +31,16 @@ $(iso): $(kernel) $(grub_cfg)
 	@grub-mkrescue -o $(iso) build/isofiles 2> /dev/null
 	@rm -rf build/isofiles
 
-$(kernel): $(assembly_object_files) $(linker_script)
-	@ld -n -T $(linker_script) -o $(kernel) $(assembly_object_files)
+$(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)
+	@ld --gc-sections -n -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_os)
 
 # compile assembly files
 build/arch/$(arch)/%.o: src/arch/$(arch)/%.asm
 	@mkdir -p $(shell dirname $@)
 	@nasm -felf64 $< -o $@
+
+cargo:
+	@cargo build --target $(target)
+
+dump:
+	objdump -D build/kernel-x86_64.bin
