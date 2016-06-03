@@ -1,6 +1,19 @@
 use core::ptr::Unique;
 use spin::Mutex;
 
+macro_rules! print {
+    ($($arg:tt)*) => ({
+        use core::fmt::Write;
+        let mut writer = $crate::io::vga::WRITER.lock();
+        writer.write_fmt(format_args!($($arg)*)).unwrap();
+    })
+}
+
+macro_rules! println {
+    ($fmt:expr) => (print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+}
+
 pub static WRITER: Mutex<Writer> = Mutex::new(Writer {
     column_position: 0,
     color_code: ColorCode::new(Color::LightGreen, Color::Black),
@@ -112,6 +125,12 @@ impl ::core::fmt::Write for Writer {
     }
 }
 
+pub fn clear_screen() {
+    for _ in 0..BUFFER_HEIGHT {
+        println!("");
+    }
+}
+
 pub fn raw_print(color_code: u8, string: &[u8], position: i64) {
     let mut output_colored = [color_code; 24];
     for (i, char_byte) in string.into_iter().enumerate() {
@@ -121,3 +140,4 @@ pub fn raw_print(color_code: u8, string: &[u8], position: i64) {
     let buffer_ptr = (0xb8000 + position) as *mut _;
     unsafe { *buffer_ptr = output_colored }
 }
+
