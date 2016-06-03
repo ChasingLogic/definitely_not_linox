@@ -91,6 +91,9 @@ start:
   or eax, 1 << 16
   mov cr0, eax
 
+  ; load our GDT
+  lgdt [gdt64.pointer]
+
   ; Print hello world when done to make sure we succeed.
   mov word [0xb8000], 0x0248    ; H
   mov word [0xb8002], 0x0265    ; e
@@ -125,3 +128,31 @@ p3_table:
   resb 4096
 p2_table:
   resb 4096
+
+
+section .rodata                 ; stands for read only data
+; Setting up our GDT or Global Descriptor Table
+; See for more info: http://wiki.osdev.org/Global_Descriptor_Table
+gdt64:
+  ; first entry in GDT needs to be a zero value
+  dq 0
+  ; Set up the code segment of the GDT
+  ; | is bitwise or
+  dq (1<<44) | (1<<47) | (1<<41) | (1<<43) | (1<<53)
+  ; why these bits? Well, as we’ve seen with other table entries,
+  ; each bit has a meaning. Here’s a summary:
+  ; 44: ‘descriptor type’: This has to be 1 for code and data segments
+  ; 47: ‘present’: This is set to 1 if the entry is valid
+  ; 41: ‘read/write’: If this is a code segment, 1 means that it’s readable
+  ; 43: ‘executable’: Set to `1 for code segments
+  ; 53: ‘64-bit’: if this is a 64-bit GDT, this should be set
+
+  ; Set up the data segment
+  dq (1<<44) | (1<<47) | (1<<41)
+
+.pointer:
+  ; length of the gdt
+  dw .pointer - gdt64 - 1
+  ; address of the gdt
+  dq gdt64
+
