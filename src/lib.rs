@@ -2,20 +2,13 @@
 #![no_std]
 
 extern crate rlibc;
+mod io;
 
 #[no_mangle]
 pub extern fn rust_main() {
     // ATTENTION: we have a very small stack and no guard page
-    let hello = b"Hello World!";
-    let color_byte = 0x0F;
-
-    let mut hello_colored = [color_byte; 24];
-    for (i, char_byte) in hello.into_iter().enumerate() {
-        hello_colored[i*2] = *char_byte;
-    }
-
-    let buffer_ptr = (0xb8000 + 1988) as *mut _;
-    unsafe { *buffer_ptr = hello_colored }
+    io::vga::print(0x0F, b"Hello World!", 0);
+    io::vga::print(0x0F, b"Goodbye World!", 13);
 
     loop{}
 }
